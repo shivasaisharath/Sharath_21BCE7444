@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess-Like Game v1.1</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 0;
+            background-color: #fafafa;
+        }
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(5, 50px);
+            grid-template-rows: repeat(5, 50px);
+            gap: 5px;
+            margin: 20px auto;
+            width: 270px;
+        }
+        .cell {
+            width: 50px;
+            height: 50px;
+            border: 1px solid #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+        .playerA {
+            background-color: #87ceeb; /* Light blue */
+        }
+        .playerB {
+            background-color: #ff6f61; /* Light coral */
+        }
+        #move-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        #info {
+            text-align: center;
+            margin-top: 10px;
+        }
+        #move-history {
+            margin-top: 20px;
+            max-height: 150px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+        }
+        .button {
+            padding: 5px 10px;
+            font-size: 14px;
+            cursor: pointer;
+            border: none;
+            background-color: #007bff; /* Blue */
+            color: white;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        .button:hover {
+            background-color: #0056b3; /* Darker blue on hover */
+        }
+    </style>
+</head>
+<body>
+    <div id="grid"></div>
+    <div id="info">Waiting for the game to start...</div>
+    <div id="move-buttons"></div>
+    <div id="move-history">Move History:</div>
+
+    <script>
+        let ws = new WebSocket('ws://localhost:8080');
+        let playerID = prompt("Enter player ID (A or B):");
+        let selectedCharacter = null;
+        let moveButtons = document.getElementById('move-buttons');
+        let moveHistory = document.getElementById('move-history');
+
+        ws.onopen = () => {
+            const characters = prompt("Enter your characters (comma-separated, e.g., P1,H1,P2,P3,H2):").split(',');
+            ws.send(JSON.stringify({ type: 'game_init', playerID, characters }));
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'state_update') {
+                renderGrid(data.gameState.grid);
+                document.getElementById('info').innerText = `Turn: Player ${data.gameState.turn}`;
+                updateMoveHistory(data.gameState.moveHistory || []);
+            } else if (data.type === 'game_over') {
+                alert(`Game over! Player ${data.winner} wins!`);
+                document.getElementById('info').innerText = `Game over! Player ${data.winner} wins!`;
+            } else if (data.type === 'invalid_move') {
+                alert(data.message);
+            }
+        };
+
+        ws.onerror = (error) => {
+            console.error("WebSocket Error:", error);
+        };
+
+        function renderGrid(grid) {
+            const gridElement = document.getElementById('grid');
+            gridElement.innerHTML = '';
+            grid.forEach((row, rowIndex) => {
+                row.forEach((cell, colIndex) => {
+                    const cellElement = document.createElement('div');
+                    cellElement.className = 'cell';
+                    if (cell) {
+                        cellElement.innerText = cell.name;
+                        cellElement.classList.add(cell.player === 'A' ? 'playerA' : 'playerB');
+                        if (cell.player === playerID) {
+                            cellElement.onclick = () => selectCharacter(cell.name);
+                        }
+                    }
+                    gridElement.appendChild(cellElement);
+                });
+            });
+        }
+
+        function selectCharacter(character) {
+            selectedCharacter = character;
+            updateMoveButtons();
+        }
+
+        function updateMoveButtons() {
+            moveButtons.innerHTML = '';
+            if (selectedCharacter) {
+                ['L', 'R', 'F', 'B'].forEach(move => {
+                    const button = document.createElement('button');
+                    button.className = 'button';
+                    button.innerText = move;
+                    button.onclick = () => sendMove(move);
+                    moveButtons.appendChild(button);
+                });
+            }
+        }
+
+        function sendMove(move) {
+            ws.send(JSON.stringify({ type: 'player_move', playerID, character: selectedCharacter, move }));
+            selectedCharacter = null;
+            moveButtons.innerHTML = '';
+        }
+
+        function updateMoveHistory(history) {
+            moveHistory.innerHTML = 'Move History:<br>' + history.join('<br>');
+        }
+    </script>
+</body>
+</html>
