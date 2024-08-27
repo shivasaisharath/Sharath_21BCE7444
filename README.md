@@ -1,7 +1,5 @@
 # Sharath_21BCE7444
 
-Here's a sample `README.md` file that you can use for your GitHub repository:
-
 ---
 
 # Chess-Like Game v1.1
